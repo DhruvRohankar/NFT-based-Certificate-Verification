@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT Certificate Verification System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tab-btn.active {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">NFT-based Certificate Verification</h1>
+            <p class="text-gray-600 mt-2">A decentralized solution for issuing and verifying credentials on the blockchain.</p>
+        </header>
+
+        <!-- Wallet Connection -->
+        <div class="flex justify-center mb-8">
+            <button id="connectWalletBtn" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
+                Connect Wallet
+            </button>
+        </div>
+        <div id="connectionStatus" class="text-center text-sm text-gray-500 mb-8 hidden">
+             Connected as: <span id="walletAddress" class="font-mono bg-gray-100 p-1 rounded"></span>
+        </div>
+        
+        <!-- Main Content -->
+        <main class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200 mb-6">
+                <button id="verifyTabBtn" class="tab-btn flex-1 py-3 px-4 text-center font-medium text-gray-500 border-b-2 border-transparent hover:border-gray-300 hover:text-gray-700 transition active">Verify Certificate</button>
+                <button id="issueTabBtn" class="tab-btn flex-1 py-3 px-4 text-center font-medium text-gray-500 border-b-2 border-transparent hover:border-gray-300 hover:text-gray-700 transition">Issue Certificate (Admin)</button>
+            </div>
+
+            <!-- Verification Section -->
+            <div id="verifySection">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Verify a Certificate</h2>
+                <p class="text-gray-600 mb-6">Enter the Certificate ID (Token ID) to verify its authenticity on the blockchain.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label for="certificateId" class="block text-sm font-medium text-gray-700 mb-1">Certificate ID</label>
+                        <input type="text" id="certificateId" placeholder="e.g., 0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                    <button id="verifyBtn" class="w-full bg-blue-600 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">Verify</button>
+                </div>
+                <!-- Verification Result Display -->
+                <div id="verificationResult" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
+                    <!-- Dynamic content will be injected here -->
+                </div>
+            </div>
+
+            <!-- Issuance Section (Admin Only) -->
+            <div id="issueSection" class="hidden">
+                 <div id="admin-only-message" class="hidden p-4 mb-6 text-yellow-800 bg-yellow-100 border border-yellow-200 rounded-lg">
+                    <p class="font-medium">Admin Access Required</p>
+                    <p class="text-sm">Please connect with the wallet that owns the contract to issue new certificates.</p>
+                </div>
+                <div id="admin-form">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Issue a New Certificate</h2>
+                    <p class="text-gray-600 mb-6">Fill in the details below to mint a new certificate as an NFT.</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="recipientAddress" class="block text-sm font-medium text-gray-700 mb-1">Recipient's Wallet Address</label>
+                            <input type="text" id="recipientAddress" placeholder="0x..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <div>
+                            <label for="recipientName" class="block text-sm font-medium text-gray-700 mb-1">Recipient's Full Name</label>
+                            <input type="text" id="recipientName" placeholder="e.g., John Doe" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <div>
+                            <label for="courseName" class="block text-sm font-medium text-gray-700 mb-1">Course/Qualification Name</label>
+                            <input type="text" id="courseName" placeholder="e.g., Blockchain Development 101" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <button id="issueBtn" class="w-full bg-green-600 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md hover:bg-green-700 transition duration-300">Issue Certificate</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notification/Message Box -->
+            <div id="messageBox" class="fixed top-5 right-5 p-4 rounded-lg shadow-xl text-white transition-transform translate-x-[120%] hidden">
+                <p id="messageText"></p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const contractAddress = "YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE"; // IMPORTANT: Replace with your contract address
+        const contractABI = [
+            "function mintCertificate(address recipient, string memory recipientName, string memory courseName)",
+            "function getCertificateDetails(uint256 tokenId) view returns (string, string, uint256)",
+            "function owner() view returns (address)",
+            "function tokenURI(uint256 tokenId) view returns (string)",
+            "function ownerOf(uint256 tokenId) view returns (address)"
+        ];
+        // --- END CONFIGURATION ---
+
+        let provider;
+        let signer;
+        let contract;
+        let userAddress;
+        let contractOwner;
+
+        // Element References
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const walletAddressSpan = document.getElementById('walletAddress');
+        
+        const verifyTabBtn = document.getElementById('verifyTabBtn');
+        const issueTabBtn = document.getElementById('issueTabBtn');
+        const verifySection = document.getElementById('verifySection');
+        const issueSection = document.getElementById('issueSection');
+
+        const verifyBtn = document.getElementById('verifyBtn');
+        const verificationResult = document.getElementById('verificationResult');
+
+        const issueBtn = document.getElementById('issueBtn');
+        const adminOnlyMessage = document.getElementById('admin-only-message');
+        const adminForm = document.getElementById('admin-form');
+
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+
+        // --- Event Listeners ---
+        connectWalletBtn.addEventListener('click', connectWallet);
+        verifyTabBtn.addEventListener('click', () => switchTab('verify'));
+        issueTabBtn.addEventListener('click', () => switchTab('issue'));
+        verifyBtn.addEventListener('click', verifyCertificate);
+        issueBtn.addEventListener('click', issueCertificate);
+
+        // --- Core Functions ---
+
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    contract = new ethers.Contract(contractAddress, contractABI, signer);
+                    userAddress = await signer.getAddress();
+                    
+                    walletAddressSpan.textContent = `${userAddress.substring(0, 6)}...${userAddress.substring(userAddress.length - 4)}`;
+                    connectionStatus.classList.remove('hidden');
+                    connectWalletBtn.textContent = 'Wallet Connected';
+                    connectWalletBtn.disabled = true;
+
+                    await checkAdminStatus();
+                } catch (error) {
+                    console.error("Wallet connection failed:", error);
+                    showMessage('Failed to connect wallet. See console for details.', 'error');
+                }
+            } else {
+                showMessage('MetaMask is not installed. Please install it to use this DApp.', 'error');
+            }
+        }
+        
+        async function checkAdminStatus() {
+            if (!contract) return;
+            try {
+                contractOwner = await contract.owner();
+                if (userAddress && userAddress.toLowerCase() === contractOwner.toLowerCase()) {
+                    adminForm.classList.remove('hidden');
+                    adminOnlyMessage.classList.add('hidden');
+                } else {
+                    adminForm.classList.add('hidden');
+                    adminOnlyMessage.classList.remove('hidden');
+                }
+            } catch(e) {
+                console.error("Could not get contract owner", e);
+                if (contractAddress === "YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE") {
+                    showMessage('Please update the contract address in the HTML file.', 'error');
+                } else {
+                    showMessage('Error checking admin status. Is your wallet connected to the correct network?', 'error');
+                }
+                adminForm.classList.add('hidden');
+                adminOnlyMessage.classList.remove('hidden');
+            }
+        }
+
+        function switchTab(tab) {
+            if (tab === 'verify') {
+                verifySection.classList.remove('hidden');
+                issueSection.classList.add('hidden');
+                verifyTabBtn.classList.add('active');
+                issueTabBtn.classList.remove('active');
+            } else if (tab === 'issue') {
+                verifySection.classList.add('hidden');
+                issueSection.classList.remove('hidden');
+                verifyTabBtn.classList.remove('active');
+                issueTabBtn.classList.add('active');
+                checkAdminStatus(); // Re-check admin status when switching to issue tab
+            }
+        }
+
+        async function verifyCertificate() {
+            const tokenId = document.getElementById('certificateId').value;
+            if (!tokenId) {
+                showMessage('Please enter a Certificate ID.', 'error');
+                return;
+            }
+
+            verificationResult.classList.add('hidden');
+            const readOnlyProvider = new ethers.providers.Web3Provider(window.ethereum);
+            const readOnlyContract = new ethers.Contract(contractAddress, contractABI, readOnlyProvider);
+
+            try {
+                const details = await readOnlyContract.getCertificateDetails(tokenId);
+                const owner = await readOnlyContract.ownerOf(tokenId);
+
+                const [recipientName, courseName, issueTimestamp] = details;
+                const issueDate = new Date(issueTimestamp * 1000).toLocaleDateString();
+
+                verificationResult.innerHTML = `
+                    <div class="flex items-center text-green-600 mb-4">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-xl font-bold">Certificate Verified</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-white p-3 rounded-md"><strong>Certificate ID:</strong> <span class="font-mono">${tokenId}</span></div>
+                        <div class="bg-white p-3 rounded-md"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
+                        <div class="bg-white p-3 rounded-md col-span-1 md:col-span-2"><strong>Recipient Name:</strong> ${escapeHtml(recipientName)}</div>
+                        <div class="bg-white p-3 rounded-md col-span-1 md:col-span-2"><strong>Recipient Address:</strong> <span class="font-mono">${owner}</span></div>
+                        <div class="bg-white p-3 rounded-md"><strong>Issue Date:</strong> ${issueDate}</div>
+                    </div>`;
+                verificationResult.classList.remove('hidden');
+            } catch (error) {
+                console.error("Verification failed:", error);
+                verificationResult.innerHTML = `
+                    <div class="flex items-center text-red-600 mb-2">
+                         <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-xl font-bold">Verification Failed</h3>
+                    </div>
+                    <p class="text-gray-700">Could not find a certificate with ID #${tokenId}. Please check the ID and try again.</p>
+                `;
+                verificationResult.classList.remove('hidden');
+            }
+        }
+
+        async function issueCertificate() {
+            if (!signer) {
+                showMessage('Please connect your wallet first.', 'error');
+                return;
+            }
+
+            const recipientAddress = document.getElementById('recipientAddress').value;
+            const recipientName = document.getElementById('recipientName').value;
+            const courseName = document.getElementById('courseName').value;
+
+            if (!recipientAddress || !recipientName || !courseName) {
+                showMessage('Please fill out all fields.', 'error');
+                return;
+            }
+            
+            if (!ethers.utils.isAddress(recipientAddress)) {
+                showMessage('Invalid recipient wallet address.', 'error');
+                return;
+            }
+
+            try {
+                showMessage('Sending transaction to MetaMask...', 'info');
+                const tx = await contract.mintCertificate(recipientAddress, recipientName, courseName);
+                showMessage('Minting certificate... Please wait for confirmation.', 'info');
+                
+                await tx.wait();
+
+                showMessage('Certificate minted successfully!', 'success');
+                // You could listen to an event here to get the token ID and display it
+                document.getElementById('recipientAddress').value = '';
+                document.getElementById('recipientName').value = '';
+                document.getElementById('courseName').value = '';
+
+            } catch (error) {
+                console.error("Issuance failed:", error);
+                showMessage(error.reason || 'Issuance failed. Check console for details.', 'error');
+            }
+        }
+
+        // --- Utility Functions ---
+
+        function showMessage(message, type = 'info') {
+            messageText.textContent = message;
+            messageBox.className = 'fixed top-5 right-5 p-4 rounded-lg shadow-xl text-white transition-transform transform-gpu'; // Reset classes
+            
+            switch (type) {
+                case 'success':
+                    messageBox.classList.add('bg-green-500');
+                    break;
+                case 'error':
+                    messageBox.classList.add('bg-red-500');
+                    break;
+                default:
+                    messageBox.classList.add('bg-blue-500');
+                    break;
+            }
+
+            messageBox.classList.remove('hidden');
+            messageBox.classList.remove('translate-x-[120%]');
+            messageBox.classList.add('translate-x-0');
+
+
+            setTimeout(() => {
+                 messageBox.classList.remove('translate-x-0');
+                 messageBox.classList.add('translate-x-[120%]');
+            }, 5000);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, function(match) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[match];
+            });
+        }
+
+    </script>
+</body>
+</html>
